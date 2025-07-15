@@ -12,17 +12,12 @@ struct PersistenceController {
         let item = Item(context: viewContext)
         item.timestamp = Date()
         
-        // Create a theme
-        let workTheme = Theme(context: viewContext)
-        workTheme.id = UUID()
-        workTheme.name = "Work"
-        
-        // Create a tag
+        // Create a tag with color
         let codingTag = Tag(context: viewContext)
         codingTag.id = UUID()
         codingTag.name = "Coding"
         codingTag.note = "Software development tasks"
-        codingTag.theme = workTheme
+        codingTag.color = "#007AFF"
         
         // Create multiple time entries for the single tag
         let calendar = Calendar.current
@@ -37,7 +32,7 @@ struct PersistenceController {
         timeEntry1.id = UUID()
         timeEntry1.start = entry1Start
         timeEntry1.stop = entry1Stop
-        timeEntry1.friction = 2
+        timeEntry1.distractedTime = 2
         timeEntry1.tag = codingTag
         
         // Time entry 2: Yesterday 1 PM - 5 PM
@@ -48,7 +43,7 @@ struct PersistenceController {
         timeEntry2.id = UUID()
         timeEntry2.start = entry2Start
         timeEntry2.stop = entry2Stop
-        timeEntry2.friction = 1
+        timeEntry2.distractedTime = 1
         timeEntry2.tag = codingTag
         
         // Time entry 3: Today 10 AM - 11:30 AM
@@ -59,7 +54,7 @@ struct PersistenceController {
         timeEntry3.id = UUID()
         timeEntry3.start = entry3Start
         timeEntry3.stop = entry3Stop
-        timeEntry3.friction = 3
+        timeEntry3.distractedTime = 3
         timeEntry3.tag = codingTag
         
         // Time entry 4: Current ongoing session (started 2 hours ago)
@@ -69,7 +64,7 @@ struct PersistenceController {
         timeEntry4.id = UUID()
         timeEntry4.start = entry4Start
         timeEntry4.stop = now
-        timeEntry4.friction = 1
+        timeEntry4.distractedTime = 1
         timeEntry4.tag = codingTag
         
         do {

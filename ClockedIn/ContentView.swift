@@ -3,6 +3,7 @@ import CoreData
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @State private var showingAddTimeEntry = false
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
@@ -19,12 +20,42 @@ struct ContentView: View {
             List {
                 // Recent TimeEntries Section
                 Section("Recent") {
-                    ForEach(Array(timeEntries.prefix(3))) { timeEntry in
-                        NavigationLink {
-                            TimeEntryDetailView(timeEntry: timeEntry)
-                        } label: {
-                            TimeEntryRowView(timeEntry: timeEntry)
+                    if timeEntries.isEmpty {
+                        Button(action: {
+                            showingAddTimeEntry = true
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundColor(.blue)
+                                Text("Add your first time entry")
+                                    .foregroundColor(.blue)
+                                Spacer()
+                            }
+                            .padding(.vertical, 8)
                         }
+                        .buttonStyle(.plain)
+                    } else {
+                        ForEach(Array(timeEntries.prefix(3))) { timeEntry in
+                            NavigationLink {
+                                TimeEntryDetailView(timeEntry: timeEntry)
+                            } label: {
+                                TimeEntryRowView(timeEntry: timeEntry)
+                            }
+                        }
+                        
+                        Button(action: {
+                            showingAddTimeEntry = true
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle")
+                                    .foregroundColor(.blue)
+                                Text("Add time entry")
+                                    .foregroundColor(.blue)
+                                Spacer()
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 
@@ -47,10 +78,20 @@ struct ContentView: View {
                 }
 #endif
                 ToolbarItem {
+                    Button(action: {
+                        showingAddTimeEntry = true
+                    }) {
+                        Label("Add Time Entry", systemImage: "plus.circle")
+                    }
+                }
+                ToolbarItem {
                     Button(action: addItem) {
                         Label("Add Item", systemImage: "plus")
                     }
                 }
+            }
+            .sheet(isPresented: $showingAddTimeEntry) {
+                AddTimeEntryView()
             }
             Text("Select an item")
         }
@@ -96,6 +137,11 @@ struct TimeEntryRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
+                // Color indicator
+                Circle()
+                    .fill(Color(hex: timeEntry.tag?.color ?? "#999999"))
+                    .frame(width: 12, height: 12)
+                
                 Text(timeEntry.tag?.name ?? "No Tag")
                     .font(.headline)
                     .foregroundColor(.primary)
@@ -108,7 +154,7 @@ struct TimeEntryRowView: View {
             }
             
             HStack {
-                Text(timeEntry.tag?.theme?.name ?? "No Theme")
+                Text(timeEntry.tag?.note ?? "No Note")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
@@ -119,9 +165,9 @@ struct TimeEntryRowView: View {
                     .foregroundColor(.secondary)
             }
             
-            if timeEntry.friction > 0 {
+            if timeEntry.distractedTime > 0 {
                 HStack {
-                    Text("Friction: \(timeEntry.friction)")
+                    Text("Friction: \(timeEntry.distractedTime)")
                         .font(.caption)
                         .foregroundColor(.orange)
                     Spacer()
@@ -134,7 +180,7 @@ struct TimeEntryRowView: View {
     private var duration: String {
         let interval = timeEntry.stop!.timeIntervalSince(timeEntry.start!)
         let hours = Int(interval) / 3600
-        let minutes = Int(interval) % 3600 / 60
+        let minutes = Int(interval) % 3600 / 60 + 1
         
         if hours > 0 {
             return "\(hours)h \(minutes)m"
@@ -156,13 +202,15 @@ struct TimeEntryDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(timeEntry.tag?.name ?? "No Tag")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                
-                Text(timeEntry.tag?.theme?.name ?? "No Theme")
-                    .font(.title2)
-                    .foregroundColor(.secondary)
+                HStack {
+                    Circle()
+                        .fill(Color(hex: timeEntry.tag?.color ?? "#999999"))
+                        .frame(width: 20, height: 20)
+                    
+                    Text(timeEntry.tag?.name ?? "No Tag")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                }
                 
                 Text(timeEntry.tag?.note ?? "No Note")
                     .font(.body)
@@ -193,11 +241,11 @@ struct TimeEntryDetailView: View {
                     Text(duration)
                 }
                 
-                if timeEntry.friction > 0 {
+                if timeEntry.distractedTime > 0 {
                     HStack {
                         Text("Friction:")
                         Spacer()
-                        Text("\(timeEntry.friction)")
+                        Text("\(timeEntry.distractedTime)")
                             .foregroundColor(.orange)
                         Spacer()
                         Text("minutes")
