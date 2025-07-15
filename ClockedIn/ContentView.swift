@@ -4,6 +4,7 @@ import CoreData
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @State private var showingAddTimeEntry = false
+    @State private var showingStartTimer = false
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
@@ -79,6 +80,13 @@ struct ContentView: View {
 #endif
                 ToolbarItem {
                     Button(action: {
+                        showingStartTimer = true
+                    }) {
+                        Label("Start Timer", systemImage: "timer")
+                    }
+                }
+                ToolbarItem {
+                    Button(action: {
                         showingAddTimeEntry = true
                     }) {
                         Label("Add Time Entry", systemImage: "plus.circle")
@@ -92,6 +100,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingAddTimeEntry) {
                 AddTimeEntryView()
+            }
+            .sheet(isPresented: $showingStartTimer) {
+                StartTimerView()
             }
             Text("Select an item")
         }
