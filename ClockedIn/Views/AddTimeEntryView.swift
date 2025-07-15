@@ -5,22 +5,11 @@ struct AddTimeEntryView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Tag.name, ascending: true)],
-        animation: .default)
-    private var tags: FetchedResults<Tag>
-    
     @State private var selectedTag: Tag?
     @State private var startTime = Date()
     @State private var stopTime = Date()
     @State private var friction: Int32 = 1
     @State private var hasDistractions = false
-    @State private var showingNewTagSheet = false
-    
-    // For creating new tag
-    @State private var newTagName = ""
-    @State private var newTagNote = ""
-    @State private var newTagColor = "#007AFF"
     
     var body: some View {
         NavigationView {
@@ -34,43 +23,7 @@ struct AddTimeEntryView: View {
                 }
                 
                 Section("Tag") {
-                    HStack {
-                        Picker("Select Tag", selection: $selectedTag) {
-                            Text("Select a tag").tag(nil as Tag?)
-                            ForEach(tags, id: \.self) { tag in
-                                HStack {
-                                    Circle()
-                                        .fill(Color(hex: tag.color ?? "#999999"))
-                                        .frame(width: 12, height: 12)
-                                    Text(tag.name ?? "")
-                                }.tag(tag as Tag?)
-                            }
-                        }
-                        .pickerStyle(MenuPickerStyle())
-                        
-                        Button("New Tag") {
-                            showingNewTagSheet = true
-                        }
-                        .buttonStyle(.borderless)
-                    }
-                    
-                    if let selectedTag = selectedTag {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Circle()
-                                    .fill(Color(hex: selectedTag.color ?? "#999999"))
-                                    .frame(width: 16, height: 16)
-                                Text("Tag: \(selectedTag.name ?? "")")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            if let note = selectedTag.note, !note.isEmpty {
-                                Text("Note: \(note)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
+                    TagSelector(selectedTag: $selectedTag)
                 }
                 
                 Section("Distractions") {
@@ -108,14 +61,6 @@ struct AddTimeEntryView: View {
                     .disabled(!isFormValid)
                 }
             }
-        }
-        .sheet(isPresented: $showingNewTagSheet) {
-            NewTagView(
-                newTagName: $newTagName,
-                newTagNote: $newTagNote,
-                newTagColor: $newTagColor,
-                onSave: createNewTag
-            )
         }
         .onAppear {
             // Set default stop time to current time
@@ -159,28 +104,6 @@ struct AddTimeEntryView: View {
             do {
                 try viewContext.save()
                 dismiss()
-            } catch {
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
-        }
-    }
-    
-    private func createNewTag() {
-        withAnimation {
-            let newTag = Tag(context: viewContext)
-            newTag.id = UUID()
-            newTag.name = newTagName
-            newTag.note = newTagNote
-            newTag.color = newTagColor
-            
-            do {
-                try viewContext.save()
-                selectedTag = newTag
-                newTagName = ""
-                newTagNote = ""
-                newTagColor = "#007AFF"
-                showingNewTagSheet = false
             } catch {
                 let nsError = error as NSError
                 fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
