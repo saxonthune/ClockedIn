@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreData
 import Combine
+import UserNotifications
 
 // MARK: - Timer Manager Protocol
 
@@ -9,6 +10,7 @@ protocol TimerManagerProtocol: ObservableObject {
     var timeRemaining: TimeInterval { get }
     var currentTimerSession: TimerSession? { get }
     var timerDidComplete: TimerSession? { get }
+    var pendingReviewSession: TimerSession? { get }
     
     var timeString: String { get }
     var progress: Double { get }
@@ -18,6 +20,7 @@ protocol TimerManagerProtocol: ObservableObject {
     
     func startTimer(duration: TimeInterval, tag: Tag, context: NSManagedObjectContext)
     func abortTimer()
+    func clearPendingReview()
 }
 
 // MARK: - Timer Manager Implementation
@@ -30,18 +33,21 @@ class TimerManager: TimerManagerProtocol {
     @Published var timeRemaining: TimeInterval = 0
     @Published var currentTimerSession: TimerSession?
     @Published var timerDidComplete: TimerSession? = nil // For triggering TimeEntry creation
+    @Published var pendingReviewSession: TimerSession? = nil // For session awaiting review
     
     private var timer: Timer?
     private var cancellables = Set<AnyCancellable>()
     
-    private init() {}
+    private init() {
+        setupNotifications()
+    }
     
     var timerDidCompletePublisher: Published<TimerSession?>.Publisher {
         $timerDidComplete
     }
     
     func startTimer(duration: TimeInterval, tag: Tag, context: NSManagedObjectContext) {
-        guard !isTimerRunning else { return }
+        guard !isTimerRunning && pendingReviewSession == nil else { return }
         
         let session = TimerSession(
             id: UUID(),
@@ -95,8 +101,9 @@ class TimerManager: TimerManagerProtocol {
         timer = nil
         isTimerRunning = false
         
-        // Trigger TimeEntry creation through published property
+        // Store session for review and trigger completion
         if let session = currentTimerSession {
+            pendingReviewSession = session
             timerDidComplete = session
         }
         
@@ -105,6 +112,11 @@ class TimerManager: TimerManagerProtocol {
         
         // Send completion notification
         sendCompletionNotification()
+    }
+    
+    func clearPendingReview() {
+        pendingReviewSession = nil
+        timerDidComplete = nil
     }
     
     // Method for creating TimeEntry from aborted timer (synchronous)
@@ -129,9 +141,47 @@ class TimerManager: TimerManagerProtocol {
         // This would be implemented based on your app's background requirements
     }
     
+    private func setupNotifications() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if granted {
+                print("✅ Notification permission granted")
+            } else if let error = error {
+                print("❌ Notification permission denied: \(error.localizedDescription)")
+            }
+        }
+    }
+    
     private func sendCompletionNotification() {
-        // Send local notification when timer completes
-        // This would integrate with your notification system
+        guard let session = pendingReviewSession else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = "Timer Completed!"
+        content.body = "\(session.tag.name ?? "Timer") session finished. Tap to review and save."
+        content.sound = .default
+        content.badge = 1
+        
+        // Add custom data to identify this is a timer completion
+        content.userInfo = [
+            "type": "timer_completion",
+            "sessionId": session.id.uuidString,
+            "tagName": session.tag.name ?? "Unknown"
+        ]
+        
+        // Trigger notification immediately
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "timer_completion_\(session.id.uuidString)",
+            content: content,
+            trigger: trigger
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("❌ Failed to schedule notification: \(error.localizedDescription)")
+            } else {
+                print("✅ Timer completion notification scheduled")
+            }
+        }
     }
 }
 

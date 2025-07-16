@@ -5,6 +5,13 @@ import Combine
 // MARK: - Mock Timer Manager for Testing
 
 class MockTimerManager: TimerManagerProtocol {
+    @Published var pendingReviewSession: TimerSession?
+    
+    func clearPendingReview() {
+        pendingReviewSession = nil
+        timerDidComplete = nil
+    }
+    
     @Published var isTimerRunning: Bool = false
     @Published var timeRemaining: TimeInterval = 0
     @Published var currentTimerSession: TimerSession? = nil

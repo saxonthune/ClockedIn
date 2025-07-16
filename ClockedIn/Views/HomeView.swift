@@ -4,9 +4,11 @@ import CoreData
 struct HomeView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @ObservedObject private var timerManager = TimerManager.shared
+    @EnvironmentObject private var notificationDelegate: NotificationDelegate
     @State private var showingAddTimeEntry = false
     @State private var showingStartTimer = false
     @State private var showingTimerDisplay = false
+    @State private var showingReviewView = false
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
@@ -106,10 +108,31 @@ struct HomeView: View {
                 .sheet(isPresented: $showingStartTimer) {
                     StartTimerView()
                 }
+                .sheet(isPresented: $showingReviewView) {
+                    if let session = timerManager.pendingReviewSession {
+                        TimeEntryReviewView(completedSession: session)
+                            .onDisappear {
+                                timerManager.clearPendingReview()
+                                notificationDelegate.shouldShowReviewView = false
+                                notificationDelegate.reviewSession = nil
+                            }
+                    }
+                }
             }
         }
         .fullScreenCover(isPresented: $showingTimerDisplay) {
             TimerDisplayView()
+        }
+        .onReceive(notificationDelegate.$shouldShowReviewView) { shouldShow in
+            if shouldShow {
+                showingReviewView = true
+            }
+        }
+        .onReceive(timerManager.timerDidCompletePublisher) { completedSession in
+            // Show review view when timer completes (not from notification)
+            if completedSession != nil && !notificationDelegate.shouldShowReviewView {
+                showingReviewView = true
+            }
         }
     }
 
