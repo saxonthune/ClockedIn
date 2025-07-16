@@ -1,10 +1,12 @@
 import SwiftUI
 import CoreData
 
-struct ContentView: View {
+struct HomeView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.timerManager) private var timerManager
     @State private var showingAddTimeEntry = false
     @State private var showingStartTimer = false
+    @State private var showingTimerDisplay = false
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
@@ -18,93 +20,136 @@ struct ContentView: View {
 
     var body: some View {
         NavigationView {
-            List {
-                // Recent TimeEntries Section
-                Section("Recent") {
-                    if timeEntries.isEmpty {
-                        Button(action: {
-                            showingAddTimeEntry = true
-                        }) {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                    .foregroundColor(.blue)
-                                Text("Add your first time entry")
-                                    .foregroundColor(.blue)
-                                Spacer()
+            VStack {
+                // Active Timer Banner
+                if timerManager.currentTimerSession != nil {
+                    Button(action: {
+                        showingTimerDisplay = true
+                    }) {
+                        HStack {
+                            Image(systemName: "timer")
+                                .foregroundColor(.white)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Timer Running")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.9))
+                                
+                                if let session = timerManager.currentTimerSession {
+                                    Text("\(session.tag.name ?? "Unknown") • \(timerManager.timeString)")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.white)
+                                }
                             }
-                            .padding(.vertical, 8)
+                            
+                            Spacer()
+                            
+                            Text("View")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.8))
                         }
-                        .buttonStyle(.plain)
-                    } else {
-                        ForEach(Array(timeEntries.prefix(3))) { timeEntry in
-                            NavigationLink {
-                                TimeEntryDetailView(timeEntry: timeEntry)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color.blue)
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                }
+                
+                List {
+                    // Recent TimeEntries Section
+                    Section("Recent") {
+                        if timeEntries.isEmpty {
+                            Button(action: {
+                                showingAddTimeEntry = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundColor(.blue)
+                                    Text("Add your first time entry")
+                                        .foregroundColor(.blue)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            ForEach(Array(timeEntries.prefix(3))) { timeEntry in
+                                NavigationLink {
+                                    TimeEntryDetailView(timeEntry: timeEntry)
                             } label: {
                                 TimeEntryRowView(timeEntry: timeEntry)
                             }
+                            }
+                            
+                            Button(action: {
+                                showingAddTimeEntry = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "plus.circle")
+                                        .foregroundColor(.blue)
+                                    Text("Add time entry")
+                                        .foregroundColor(.blue)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        
+                    }
+                    
+                    // Original Items Section
+                    Section("Items") {
+                        ForEach(items) { item in
+                            NavigationLink {
+                                Text("Item at \(item.timestamp!, formatter: itemFormatter)")
+                            } label: {
+                                Text(item.timestamp!, formatter: itemFormatter)
+                            }
+                        }
+                        .onDelete(perform: deleteItems)
+                    }
+                }
+                .toolbar {
+#if os(iOS)
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        EditButton()
+                    }
+#endif
+                    ToolbarItem {
+                        Button(action: {
+                            showingStartTimer = true
+                        }) {
+                            Label("Start Timer", systemImage: "timer")
+                        }
+                    }
+                    ToolbarItem {
                         Button(action: {
                             showingAddTimeEntry = true
                         }) {
-                            HStack {
-                                Image(systemName: "plus.circle")
-                                    .foregroundColor(.blue)
-                                Text("Add time entry")
-                                    .foregroundColor(.blue)
-                                Spacer()
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                
-                // Original Items Section
-                Section("Items") {
-                    ForEach(items) { item in
-                        NavigationLink {
-                            Text("Item at \(item.timestamp!, formatter: itemFormatter)")
-                        } label: {
-                            Text(item.timestamp!, formatter: itemFormatter)
+                            Label("Add Time Entry", systemImage: "plus.circle")
                         }
                     }
-                    .onDelete(perform: deleteItems)
-                }
-            }
-            .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-#endif
-                ToolbarItem {
-                    Button(action: {
-                        showingStartTimer = true
-                    }) {
-                        Label("Start Timer", systemImage: "timer")
+                    ToolbarItem {
+                        Button(action: addItem) {
+                            Label("Add Item", systemImage: "plus")
+                        }
                     }
                 }
-                ToolbarItem {
-                    Button(action: {
-                        showingAddTimeEntry = true
-                    }) {
-                        Label("Add Time Entry", systemImage: "plus.circle")
-                    }
+                .sheet(isPresented: $showingAddTimeEntry) {
+                    AddTimeEntryView()
                 }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
+                .sheet(isPresented: $showingStartTimer) {
+                    StartTimerView()
                 }
+                Text("Select an item")
             }
-            .sheet(isPresented: $showingAddTimeEntry) {
-                AddTimeEntryView()
-            }
-            .sheet(isPresented: $showingStartTimer) {
-                StartTimerView()
-            }
-            Text("Select an item")
+        }
+        .fullScreenCover(isPresented: $showingTimerDisplay) {
+            TimerDisplayView()
         }
     }
 
@@ -292,5 +337,5 @@ private let itemFormatter: DateFormatter = {
 }()
 
 #Preview {
-    ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+    HomeView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }
