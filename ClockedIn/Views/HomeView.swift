@@ -3,7 +3,7 @@ import CoreData
 
 struct HomeView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @Environment(\.timerManager) private var timerManager
+    @ObservedObject private var timerManager = TimerManager.shared
     @State private var showingAddTimeEntry = false
     @State private var showingStartTimer = false
     @State private var showingTimerDisplay = false
@@ -21,46 +21,20 @@ struct HomeView: View {
     var body: some View {
         NavigationView {
             VStack {
-                // Active Timer Banner
-                if timerManager.currentTimerSession != nil {
-                    Button(action: {
-                        showingTimerDisplay = true
-                    }) {
-                        HStack {
-                            Image(systemName: "timer")
-                                .foregroundColor(.white)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Timer Running")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.9))
-                                
-                                if let session = timerManager.currentTimerSession {
-                                    Text("\(session.tag.name ?? "Unknown") • \(timerManager.timeString)")
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
-                                        .foregroundColor(.white)
-                                }
-                            }
-                            
-                            Spacer()
-                            
-                            Text("View")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.8))
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color.blue)
-                        .cornerRadius(8)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                }
-                
                 List {
-                    // Recent TimeEntries Section
+                    Section("Active Timer") {
+                        if let session = timerManager.currentTimerSession {
+                            ActiveTimerRowView(session: session, timerManager: timerManager)
+                        } else {
+                            Button(action: {
+                                showingStartTimer = true
+                            }) {
+                                StartTimerRowView()
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    
                     Section("Recent") {
                         if timeEntries.isEmpty {
                             Button(action: {
@@ -101,17 +75,6 @@ struct HomeView: View {
                         }
                     }
                     
-                    // Original Items Section
-                    Section("Items") {
-                        ForEach(items) { item in
-                            NavigationLink {
-                                Text("Item at \(item.timestamp!, formatter: itemFormatter)")
-                            } label: {
-                                Text(item.timestamp!, formatter: itemFormatter)
-                            }
-                        }
-                        .onDelete(perform: deleteItems)
-                    }
                 }
                 .toolbar {
 #if os(iOS)
@@ -119,13 +82,6 @@ struct HomeView: View {
                         EditButton()
                     }
 #endif
-                    ToolbarItem {
-                        Button(action: {
-                            showingStartTimer = true
-                        }) {
-                            Label("Start Timer", systemImage: "timer")
-                        }
-                    }
                     ToolbarItem {
                         Button(action: {
                             showingAddTimeEntry = true
@@ -145,7 +101,6 @@ struct HomeView: View {
                 .sheet(isPresented: $showingStartTimer) {
                     StartTimerView()
                 }
-                Text("Select an item")
             }
         }
         .fullScreenCover(isPresented: $showingTimerDisplay) {
@@ -183,6 +138,103 @@ struct HomeView: View {
             }
         }
     }
+}
+
+// MARK: - Active Timer Views
+
+struct StartTimerRowView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                // Play icon
+                Image(systemName: "plus.circle")
+                    .font(.title2)
+                    .foregroundColor(.blue)
+                
+                Text("Start Timer")
+                    .font(.headline)
+                    .foregroundColor(.blue)
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Text("Tap to start a new timer session")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+struct ActiveTimerRowView: View {
+    let session: TimerSession
+    @ObservedObject var timerManager: TimerManager
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                // Color indicator
+                Circle()
+                    .fill(Color(hex: session.tag.color ?? "#999999"))
+                    .frame(width: 12, height: 12)
+                
+                Text(session.tag.name ?? "No Tag")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Text(timerManager.timeString)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.blue)
+            }
+            
+            HStack {
+                Text(session.tag.note ?? "No Note")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Text("Started: \(timeFormatter.string(from: session.startTime))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            HStack {
+                Text("Duration: \(session.formattedDuration)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Text("Ends: \(timeFormatter.string(from: endTime))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            // Progress bar
+            ProgressView(value: timerManager.progress)
+                .progressViewStyle(LinearProgressViewStyle(tint: Color(hex: session.tag.color ?? "#999999")))
+                .frame(height: 4)
+        }
+        .padding(.vertical, 2)
+    }
+    
+    private var endTime: Date {
+        session.startTime.addingTimeInterval(session.duration)
+    }
+    
+    private let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter
+    }()
 }
 
 // MARK: - TimeEntry Views
@@ -223,7 +275,7 @@ struct TimeEntryRowView: View {
             
             if timeEntry.distractedTime > 0 {
                 HStack {
-                    Text("Friction: \(timeEntry.distractedTime)")
+                    Text("\(timeEntry.distractedTime)m distracted")
                         .font(.caption)
                         .foregroundColor(.orange)
                     Spacer()

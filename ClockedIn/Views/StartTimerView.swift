@@ -15,7 +15,7 @@ struct StartTimerView: View {
                 
                 // Tag Selection
                 VStack(spacing: 12) {
-                    Text("Tag")
+                    Text("Select Tag")
                         .font(.headline)
                     
                     TagSelector(selectedTag: $selectedTag)
@@ -23,7 +23,7 @@ struct StartTimerView: View {
                 
                 // Duration Input
                 VStack(spacing: 16) {
-                    Text("Duration")
+                    Text("Set Duration")
                         .font(.headline)
                     
                     HStack {
@@ -106,7 +106,7 @@ struct StartTimerView: View {
                     
                     // Helper text when disabled
                     if !isFormValid {
-                        Text(selectedTag == nil ? "Select a tag to start the timer" : "Please set a duration greater than 0")
+                        Text(getDisabledMessage())
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .padding(.horizontal)
@@ -129,11 +129,22 @@ struct StartTimerView: View {
     }
     
     private var isFormValid: Bool {
-        selectedTag != nil && durationMinutes > 0
+        selectedTag != nil && durationMinutes > 0 && !timerManager.isTimerRunning
+    }
+    
+    private func getDisabledMessage() -> String {
+        if timerManager.isTimerRunning {
+            return "A timer is already running"
+        } else if selectedTag == nil {
+            return "Select a tag to start the timer"
+        } else {
+            return "Please set a duration greater than 0"
+        }
     }
     
     private func startNewTimer() {
         guard let selectedTag = selectedTag else { return }
+        guard !timerManager.isTimerRunning else { return }
         
         let duration = TimeInterval(durationMinutes * 60)
         timerManager.startTimer(duration: duration, tag: selectedTag, context: viewContext)
