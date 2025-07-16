@@ -2,7 +2,8 @@ import SwiftUI
 
 struct TimerDisplayView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.timerManager) private var timerManager
+    @ObservedObject private var timerManager = TimerManager.shared
+    @State private var showingEndConfirmation = false
     
     var body: some View {
         NavigationView {
@@ -19,9 +20,25 @@ struct TimerDisplayView: View {
                                 .fontWeight(.semibold)
                         }
                         
-                        Text("Duration: \(session.formattedDuration)")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        HStack(spacing: 20) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Started")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(timeFormatter.string(from: session.startTime))
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("Ends")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(timeFormatter.string(from: endTime))
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                        }
                     }
                 }
                 
@@ -49,23 +66,6 @@ struct TimerDisplayView: View {
                     }
                 }
                 
-                // Timer Controls
-                HStack(spacing: 30) {
-                    Button(action: {
-                        timerManager.abortTimer()
-                        dismiss()
-                    }) {
-                        VStack(spacing: 8) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.title)
-                            Text("Abort")
-                                .font(.caption)
-                        }
-                        .foregroundColor(.red)
-                    }
-                }
-                .padding(.horizontal, 40)
-                
                 Spacer()
             }
             .padding()
@@ -78,6 +78,35 @@ struct TimerDisplayView: View {
                     }
                 }
             }
+            .safeAreaInset(edge: .bottom) {
+                // Fixed End Timer button at bottom
+                Button(action: {
+                    showingEndConfirmation = true
+                }) {
+                    HStack {
+                        Image(systemName: "stop.fill")
+                        Text("End Timer")
+                    }
+                    .font(.title3)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.red)
+                    .cornerRadius(12)
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+            }
+        }
+        .confirmationDialog("End Timer", isPresented: $showingEndConfirmation) {
+            Button("End Timer", role: .destructive) {
+                timerManager.abortTimer()
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Ending the timer will create a new session. You can create a new timer later.")
         }
         .onAppear {
             // If no active timer, dismiss this view
@@ -92,8 +121,35 @@ struct TimerDisplayView: View {
             }
         }
     }
+    
+    // MARK: - Computed Properties
+    
+    private var endTime: Date {
+        guard let session = timerManager.currentTimerSession else { return Date() }
+        return session.startTime.addingTimeInterval(session.duration)
+    }
+    
+    private let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter
+    }()
 }
 
 #Preview {
-    TimerDisplayView()
+    // Create a mock timer session for preview
+    let mockTimerManager = TimerManager.shared
+    let mockTag = Tag(context: PersistenceController.preview.container.viewContext)
+    mockTag.name = "Work"
+    mockTag.color = "#007AFF"
+    mockTag.note = "Focus session"
+    
+    // Start a mock timer
+    mockTimerManager.startTimer(
+        duration: 25 * 60, // 25 minutes
+        tag: mockTag,
+        context: PersistenceController.preview.container.viewContext
+    )
+    
+    return TimerDisplayView()
 }

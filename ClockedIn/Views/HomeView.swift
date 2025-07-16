@@ -24,7 +24,12 @@ struct HomeView: View {
                 List {
                     Section("Active Timer") {
                         if let session = timerManager.currentTimerSession {
-                            ActiveTimerRowView(session: session, timerManager: timerManager)
+                            Button(action: {
+                                showingTimerDisplay = true
+                            }) {
+                                ActiveTimerRowView(session: session, timerManager: timerManager)
+                            }
+                            .buttonStyle(.plain)
                         } else {
                             Button(action: {
                                 showingStartTimer = true
